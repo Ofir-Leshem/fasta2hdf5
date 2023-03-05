@@ -17,7 +17,7 @@ update DST_DIR to hold the path to which the HDF5 files will be saved.<br>
 #### Script
 <p>
 The fasta2hdf5.py script does the translation.<br>
-The 6mers.txt files should be saved in the same directory as the script.
+The 6mers.txt file should be saved in the same directory as the script.
 </p>
 
 ### Credits
