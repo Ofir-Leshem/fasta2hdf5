@@ -67,5 +67,5 @@ if __name__ == '__main__':
     config = configparser.ConfigParser()
     config.read("config.ini")
     src_path = config.get('INFO', 'SRC_DIR')
-    dst_path = config.get('INFO', 'SRC_DIR')
+    dst_path = config.get('INFO', 'DST_DIR')
     fasta2hdf5(src_path, dst_path)
