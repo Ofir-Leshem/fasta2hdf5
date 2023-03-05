@@ -11,7 +11,7 @@ The FASTA files are divided into k-mers (k=6), and matched with a mean current e
 #### Update config file
 <p>
 update SRC_DIR to hold the path in which the FASTA files are saved.<br>
-update DST_DIR to hold the path to which the HDF5 files will be saved.<br>
+update DST_DIR to hold the path in which the HDF5 files will be saved.<br>
 </p>
 
 #### Script
