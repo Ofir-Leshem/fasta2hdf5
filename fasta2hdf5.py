@@ -1,9 +1,19 @@
 import math
 import os
+import random
+
 import h5py
 import numpy as np
 from Bio import SeqIO
 import configparser
+
+
+def rand(seq):
+    bases = ['A', 'C', 'G', 'T']
+    for i in range(len(seq)):
+        if seq[i] == 'N':
+            seq = seq[:i] + bases[random.randint(0, 3)] + seq[i + 1:]
+    return seq
 
 
 def readFastaSequence(fasta_filepath):
@@ -11,7 +21,7 @@ def readFastaSequence(fasta_filepath):
     name, sequence = 0, 0
     for fasta in fasta_sequences:
         name, sequence = fasta.id, str(fasta.seq)
-    return sequence
+    return rand(sequence)
 
 
 def build_6mers_dict():
