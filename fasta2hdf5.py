@@ -7,20 +7,43 @@ import numpy as np
 from Bio import SeqIO
 import configparser
 
+from tempfile import mkstemp
+from shutil import move, copymode
+from os import fdopen, remove
 
-def rand(seq):
+READ_SIZE = 1000000
+NUMBER_OF_READS = 1
+
+
+def rand(sequences):
     bases = ['A', 'C', 'G', 'T']
-    for i in range(len(seq)):
-        if seq[i] == 'N':
-            seq = seq[:i] + bases[random.randint(0, 3)] + seq[i + 1:]
-    return seq
+    rand_sequences = []
+    for seq in sequences:
+        for i in range(len(seq)):
+            if seq[i] != 'A' and seq[i] != 'C' and seq[i] != 'G' and seq[i] != 'T':
+                seq = seq[:i] + bases[random.randint(0, 3)] + seq[i + 1:]
+        rand_sequences.append(seq)
+    return rand_sequences
 
 
 def readFastaSequence(fasta_filepath):
     fasta_sequences = SeqIO.parse(open(fasta_filepath), 'fasta')
-    name, sequence = 0, 0
+    name, sequence = [], []
     for fasta in fasta_sequences:
-        name, sequence = fasta.id, str(fasta.seq)
+        # sequence.append(str(fasta.seq))
+        rem = len(fasta) % READ_SIZE
+        if rem == 0:
+            split = np.array_split(fasta.seq, len(fasta.seq) / READ_SIZE)
+        elif len(fasta) >= READ_SIZE:
+            split = np.array_split(fasta.seq[:-rem], len(fasta.seq) / READ_SIZE)
+        else:
+            split = []
+
+        for s in split:
+            if len(s) >= READ_SIZE:
+                name.append(fasta.id)
+                sequence.append(''.join(s))
+
     return rand(sequence)
 
 
@@ -33,18 +56,21 @@ def build_6mers_dict():
     return d
 
 
-def translate(seq, kmers_dict, kmer_size=6):
-    l = np.zeros(len(seq))
-    cnt = 0
-    for k in range(len(seq) - kmer_size):
-        if 'N' in seq[k:k + kmer_size]:
-            cnt += 1
-        else:
-            l[k - cnt] = kmers_dict[seq[k:k + kmer_size]]
-    for i in range(len(l)):
-        if math.isnan(l[i]) or l[i] == 0:
-            np.delete(l, i)
-    return discrete_normalize(l * 100)
+def translate(sequences, kmers_dict, kmer_size=6):
+    normalized = []
+    for seq in sequences:
+        l = np.zeros(len(seq))
+        cnt = 0
+        for k in range(len(seq) - kmer_size):
+            if 'N' in seq[k:k + kmer_size]:
+                cnt += 1
+            else:
+                l[k - cnt] = kmers_dict[seq[k:k + kmer_size]]
+        for i in range(len(l)):
+            if math.isnan(l[i]) or l[i] == 0:
+                np.delete(l, i)
+        normalized.append(discrete_normalize(l * 100))
+    return normalized
 
 
 # Code by https://github.com/TimD1/SquiggleFilter/blob/master/sdtw_analysis.ipynb
@@ -60,20 +86,31 @@ def discrete_normalize(seq, bits=8, minval=-4, maxval=4):
 
 
 def create_hdf5(values, hdf5_filepathpath):
-    f = h5py.File(hdf5_filepathpath, 'w')
-    dset = f.create_dataset("dataset", data=values)
+    if len(values) >= NUMBER_OF_READS:
+        n_samples = len(values)
+        rand_gen = np.random.RandomState(0)
+        indices = np.arange(n_samples)
+        # rand_gen.shuffle(indices)
+        indices = indices[:NUMBER_OF_READS]
+        values = [values[i] for i in indices]
+        f = h5py.File(hdf5_filepathpath, 'w')
+        for i in range(len(values)):
+            s = "read_" + str(i)
+            f.create_dataset(s, data=values[i])
 
 
 def fasta2hdf5(fasta_path, hdf5_path):
     kmers_dict = build_6mers_dict()
     for fn in os.listdir(fasta_path):
-        if os.path.isfile(os.path.join(fasta_path, fn)) and os.path.splitext(fn)[-1].lower() == ".fasta":
+        if os.path.isfile(os.path.join(fasta_path, fn)) and (
+                os.path.splitext(fn)[-1].lower() == ".fasta" or os.path.splitext(fn)[-1].lower() == ".fna"):
             seq = readFastaSequence(os.path.join(fasta_path, fn))
             currents = translate(seq, kmers_dict)
             create_hdf5(currents, os.path.join(hdf5_path, os.path.splitext(fn)[0] + ".hdf5"))
 
 
 if __name__ == '__main__':
+    # replace(r"C:\Users\ofirl\PycharmProjects\pythonProject\pythonProject\NCBI_data\e_coli\GCF_946909605.1_NILS35_genomic.fna")
     config = configparser.ConfigParser()
     config.read("config.ini")
     src_path = config.get('INFO', 'SRC_DIR')
